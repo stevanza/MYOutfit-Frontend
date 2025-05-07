@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+MyOutfit is a web-based fashion application that allows users to upload clothing items, mix & match outfits visually, and receive outfit recommendations based on the weather and mood. Built with Next.js, the project is structured using modular and reusable components for a clean, maintainable, and scalable frontend.
 
-## Getting Started
+✨ Key Features
+🧥 Upload Clothes: Users can add their own wardrobe items through a simple form
 
-First, run the development server:
+🎨 Mix & Match Canvas: Drag-and-drop canvas to create and try outfit combinations
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+🌤️ Weather-Based Recommendations: Outfit suggestions based on real-time weather data
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+😊 Mood-Based Recommendations: Choose your mood to receive personalized style ideas
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+🧩 Component-Based Architecture: Clean separation of UI components for easier development
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+👚 Organized Wardrobe View: Displays items by category: tops, bottoms, and shoes
 
-## Learn More
+🚀 Getting Started
+To run the project locally:
 
-To learn more about Next.js, take a look at the following resources:
+1. Clone this repository:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+   `git clone https://github.com/your-username/stevanza-myoutfit-frontend.git
+    cd stevanza-myoutfit-frontend`
+2. Install dependencies:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+   `npm install`
+3. Start the development server:
 
-## Deploy on Vercel
+   `npm run dev`
+4. Access in your browser:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+   `http://localhost:3000`
+   
+🛠️ Built With
+Next.js
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+React
+
+Tailwind CSS
+
+PostCSS
+
+ESLint
