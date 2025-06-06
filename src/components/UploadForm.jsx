@@ -1,332 +1,308 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { uploadClothing } from '@/lib/api';
+import { useState } from 'react';
 
-const UploadForm = ({ onUploadSuccess }) => {
+export default function UploadForm() {
   const [formData, setFormData] = useState({
     name: '',
-    category: 'tops',
+    category: '',
     color: '',
-    season: 'all',
-    style: 'casual'
+    brand: '',
+    size: '',
+    description: ''
   });
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
 
-  const [image, setImage] = useState(null);
-  const [preview, setPreview] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const fileInputRef = useRef(null);
+  const categories = [
+    { value: '', label: 'Pilih Kategori' },
+    { value: 'tops', label: 'Atasan' },
+    { value: 'bottoms', label: 'Bawahan' },
+    { value: 'shoes', label: 'Sepatu' },
+    { value: 'accessories', label: 'Aksesori' }
+  ];
 
-  const handleChange = (e) => {
+  const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
-  const handleImageChange = (e) => {
+  const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setError('File size exceeds 5MB limit');
-        return;
-      }
-      
-      setImage(file);
-      setPreview(URL.createObjectURL(file));
-      setError(''); // Clear any previous errors
+      setSelectedFile(file);
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
     }
-  };
-  
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
-      
-      if (!file.type.startsWith('image/')) {
-        setError('Please upload an image file');
-        return;
-      }
-      
-      if (file.size > 5 * 1024 * 1024) {
-        setError('File size exceeds 5MB limit');
-        return;
-      }
-      
-      setImage(file);
-      setPreview(URL.createObjectURL(file));
-      setError('');
-    }
-  };
-  
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
-    setSuccess('');
+    if (!selectedFile) {
+      alert('Silakan pilih file gambar terlebih dahulu');
+      return;
+    }
 
-    if (!image) {
-      setError('Please select an image');
-      setLoading(false);
-      return;
-    }
+    // Debug environment variables
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    console.log('Raw API URL:', apiUrl);
+    console.log('API URL type:', typeof apiUrl);
+    console.log('API URL undefined?', apiUrl === undefined);
     
-    if (!formData.name.trim()) {
-      setError('Please enter a name for the clothing item');
-      setLoading(false);
+    // Fallback jika env variable tidak terbaca
+    const finalApiUrl = apiUrl || 'http://localhost:5001/api';
+    console.log('Final API URL:', finalApiUrl);
+    console.log('Full upload URL:', `${finalApiUrl}/upload`);
+
+    // Test backend connection first
+    try {
+      console.log('Testing backend connection...');
+      const testResponse = await fetch(`${finalApiUrl}/test`);
+      console.log('Backend test status:', testResponse.status);
+      if (!testResponse.ok) {
+        throw new Error(`Backend not responding. Status: ${testResponse.status}`);
+      }
+      const testData = await testResponse.json();
+      console.log('Backend test response:', testData);
+    } catch (testError) {
+      console.error('Backend connection test failed:', testError);
+      alert(`Backend tidak dapat diakses: ${testError.message}. Pastikan backend berjalan di http://localhost:5001`);
       return;
     }
+
+    setIsUploading(true);
+    
+    const submitFormData = new FormData();
+    submitFormData.append('image', selectedFile);
+    Object.keys(formData).forEach(key => {
+      submitFormData.append(key, formData[key]);
+    });
 
     try {
-      const data = new FormData();
-      data.append('image', image);
-      data.append('name', formData.name);
-      data.append('category', formData.category);
-      data.append('color', formData.color);
-      data.append('season', formData.season);
-      data.append('style', formData.style);
-
-      // Log data being sent for debugging
-      console.log('Uploading:', {
-        name: formData.name,
-        category: formData.category,
-        color: formData.color,
-        season: formData.season,
-        style: formData.style,
-        image: image.name
+      console.log('Sending upload request to:', `${finalApiUrl}/upload`);
+      
+      const response = await fetch(`${finalApiUrl}/upload`, {
+        method: 'POST',
+        body: submitFormData,
       });
 
-      const response = await uploadClothing(data);
-      
-      setSuccess('Clothing uploaded successfully!');
-      setFormData({
-        name: '',
-        category: 'tops',
-        color: '',
-        season: 'all',
-        style: 'casual'
-      });
-      setImage(null);
-      setPreview(null);
-      
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Upload result:', result);
+        
+        if (result.success) {
+          alert('Pakaian berhasil diupload!');
+          // Reset form
+          setFormData({
+            name: '',
+            category: '',
+            color: '',
+            brand: '',
+            size: '',
+            description: ''
+          });
+          setSelectedFile(null);
+          setPreviewUrl(null);
+        } else {
+          throw new Error(result.message || 'Upload gagal');
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Upload failed with status:', response.status, errorData);
+        throw new Error(errorData.error || `Upload gagal dengan status ${response.status}`);
       }
+    } catch (error) {
+      console.error('Error uploading:', error);
       
-      if (onUploadSuccess) {
-        onUploadSuccess(response.data);
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        alert('Tidak dapat terhubung ke server. Pastikan backend berjalan di http://localhost:5001');
+      } else {
+        alert(`Terjadi kesalahan saat upload: ${error.message}`);
       }
-    } catch (err) {
-      console.error('Upload error:', err);
-      setError(err.response?.data?.error || 'Failed to upload clothing');
     } finally {
-      setLoading(false);
+      setIsUploading(false);
     }
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 max-w-2xl mx-auto">
-      <h2 className="text-2xl font-semibold mb-6 text-center">Upload New Clothing</h2>
-      
-      {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
-          <p className="text-red-700">{error}</p>
-        </div>
-      )}
-      
-      {success && (
-        <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-6">
-          <p className="text-green-700">{success}</p>
-        </div>
-      )}
-      
-      <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Image <span className="text-red-500">*</span>
-            </label>
-            <div 
-              className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-indigo-300 transition-colors"
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-            >
-              <div className="space-y-1 text-center">
-                {preview ? (
-                  <div className="mb-4">
-                    <img
-                      src={preview}
-                      alt="Preview"
-                      className="max-h-64 mx-auto object-contain"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setImage(null);
-                        setPreview(null);
-                        if (fileInputRef.current) {
-                          fileInputRef.current.value = '';
-                        }
-                      }}
-                      className="mt-2 text-xs text-red-500 hover:text-red-700"
-                    >
-                      Remove image
-                    </button>
-                  </div>
-                ) : (
-                  <svg
-                    className="mx-auto h-12 w-12 text-gray-400"
-                    stroke="currentColor"
-                    fill="none"
-                    viewBox="0 0 48 48"
-                  >
-                    <path
-                      d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )}
-                <div className="flex text-sm text-gray-600 justify-center">
-                  <label
-                    htmlFor="file-upload"
-                    className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500"
-                  >
-                    <span>Upload a file</span>
-                    <input
-                      id="file-upload"
-                      name="file-upload"
-                      type="file"
-                      className="sr-only"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      ref={fileInputRef}
-                    />
-                  </label>
-                  <p className="pl-1">or drag and drop</p>
+    <div className="upload-form">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Upload Gambar */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Upload Gambar Pakaian *
+          </label>
+          <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-gray-400 transition-colors">
+            <div className="space-y-1 text-center">
+              {previewUrl ? (
+                <div className="mb-4">
+                  <img 
+                    src={previewUrl} 
+                    alt="Preview" 
+                    className="mx-auto h-32 w-32 object-cover rounded-lg"
+                  />
                 </div>
-                <p className="text-xs text-gray-500">PNG, JPG, GIF up to 5MB</p>
+              ) : (
+                <svg
+                  className="mx-auto h-12 w-12 text-gray-400"
+                  stroke="currentColor"
+                  fill="none"
+                  viewBox="0 0 48 48"
+                >
+                  <path
+                    d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+              <div className="flex text-sm text-gray-600">
+                <label
+                  htmlFor="file-upload"
+                  className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
+                >
+                  <span>Upload file</span>
+                  <input
+                    id="file-upload"
+                    name="file-upload"
+                    type="file"
+                    className="sr-only"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    required
+                  />
+                </label>
+                <p className="pl-1 text-gray-500">atau drag and drop</p>
               </div>
+              <p className="text-xs text-gray-500">PNG, JPG, GIF sampai 10MB</p>
             </div>
           </div>
+        </div>
 
-          <div className="md:col-span-2">
+        {/* Grid untuk form fields */}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          {/* Nama Pakaian */}
+          <div className="sm:col-span-2">
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-              Name <span className="text-red-500">*</span>
+              Nama Pakaian *
             </label>
             <input
               type="text"
-              id="name"
               name="name"
+              id="name"
               value={formData.name}
-              onChange={handleChange}
+              onChange={handleInputChange}
+              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Contoh: Kemeja Putih Formal"
               required
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              placeholder="e.g. Blue Denim Jacket"
             />
           </div>
 
+          {/* Kategori */}
           <div>
             <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
-              Category <span className="text-red-500">*</span>
+              Kategori *
             </label>
             <select
-              id="category"
               name="category"
+              id="category"
               value={formData.category}
-              onChange={handleChange}
+              onChange={handleInputChange}
+              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               required
-              className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
             >
-              <option value="tops">Tops</option>
-              <option value="bottoms">Bottoms</option>
-              <option value="shoes">Shoes</option>
-              <option value="accessories">Accessories</option>
+              {categories.map(cat => (
+                <option key={cat.value} value={cat.value} className="text-gray-900">
+                  {cat.label}
+                </option>
+              ))}
             </select>
           </div>
 
+          {/* Warna */}
           <div>
             <label htmlFor="color" className="block text-sm font-medium text-gray-700 mb-1">
-              Color
+              Warna
             </label>
             <input
               type="text"
-              id="color"
               name="color"
+              id="color"
               value={formData.color}
-              onChange={handleChange}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              placeholder="e.g. Blue, Red, Black"
+              onChange={handleInputChange}
+              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Contoh: Putih, Biru Navy"
             />
           </div>
 
+          {/* Brand */}
           <div>
-            <label htmlFor="season" className="block text-sm font-medium text-gray-700 mb-1">
-              Season
+            <label htmlFor="brand" className="block text-sm font-medium text-gray-700 mb-1">
+              Brand/Merek
             </label>
-            <select
-              id="season"
-              name="season"
-              value={formData.season}
-              onChange={handleChange}
-              className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            >
-              <option value="all">All Seasons</option>
-              <option value="spring">Spring</option>
-              <option value="summer">Summer</option>
-              <option value="fall">Fall</option>
-              <option value="winter">Winter</option>
-            </select>
+            <input
+              type="text"
+              name="brand"
+              id="brand"
+              value={formData.brand}
+              onChange={handleInputChange}
+              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Contoh: Uniqlo, Zara"
+            />
           </div>
 
+          {/* Ukuran */}
           <div>
-            <label htmlFor="style" className="block text-sm font-medium text-gray-700 mb-1">
-              Style
+            <label htmlFor="size" className="block text-sm font-medium text-gray-700 mb-1">
+              Ukuran
             </label>
-            <select
-              id="style"
-              name="style"
-              value={formData.style}
-              onChange={handleChange}
-              className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            >
-              <option value="casual">Casual</option>
-              <option value="formal">Formal</option>
-              <option value="business">Business</option>
-              <option value="sporty">Sporty</option>
-              <option value="party">Party</option>
-            </select>
+            <input
+              type="text"
+              name="size"
+              id="size"
+              value={formData.size}
+              onChange={handleInputChange}
+              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Contoh: S, M, L, XL"
+            />
           </div>
         </div>
 
-        <div className="mt-6">
+        {/* Deskripsi */}
+        <div>
+          <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+            Deskripsi (Opsional)
+          </label>
+          <textarea
+            name="description"
+            id="description"
+            rows={3}
+            value={formData.description}
+            onChange={handleInputChange}
+            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Tambahkan catatan tentang pakaian ini..."
+          />
+        </div>
+
+        {/* Submit Button */}
+        <div className="flex justify-end">
           <button
             type="submit"
-            disabled={loading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-300 disabled:cursor-not-allowed"
+            disabled={isUploading}
+            className="px-6 py-2 bg-blue-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {loading ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Uploading...
-              </>
-            ) : 'Upload Clothing'}
+            {isUploading ? 'Mengupload...' : 'Upload Pakaian'}
           </button>
         </div>
       </form>
     </div>
   );
-};
-
-export default UploadForm;
+}
