@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function UploadForm() {
   const [formData, setFormData] = useState({
@@ -14,6 +14,11 @@ export default function UploadForm() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState(null);
+  const [mounted, setMounted] = useState(false);
+
+  // API URL
+  const API_BASE_URL = 'http://localhost:3001/api';
 
   const categories = [
     { value: '', label: 'Pilih Kategori' },
@@ -22,6 +27,11 @@ export default function UploadForm() {
     { value: 'shoes', label: 'Sepatu' },
     { value: 'accessories', label: 'Aksesori' }
   ];
+
+  // Fix hydration
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -34,105 +44,132 @@ export default function UploadForm() {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setUploadStatus({ type: 'error', message: 'Hanya file gambar yang diperbolehkan' });
+        return;
+      }
+      
+      // Validate file size (10MB max)
+      if (file.size > 10 * 1024 * 1024) {
+        setUploadStatus({ type: 'error', message: 'Ukuran file maksimal 10MB' });
+        return;
+      }
+
       setSelectedFile(file);
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
+      setUploadStatus(null);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
     if (!selectedFile) {
-      alert('Silakan pilih file gambar terlebih dahulu');
+      setUploadStatus({ type: 'error', message: 'Silakan pilih file gambar terlebih dahulu' });
       return;
     }
 
-    // Debug environment variables
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    console.log('Raw API URL:', apiUrl);
-    console.log('API URL type:', typeof apiUrl);
-    console.log('API URL undefined?', apiUrl === undefined);
-    
-    // Fallback jika env variable tidak terbaca
-    const finalApiUrl = apiUrl || 'http://localhost:5001/api';
-    console.log('Final API URL:', finalApiUrl);
-    console.log('Full upload URL:', `${finalApiUrl}/upload`);
-
-    // Test backend connection first
-    try {
-      console.log('Testing backend connection...');
-      const testResponse = await fetch(`${finalApiUrl}/test`);
-      console.log('Backend test status:', testResponse.status);
-      if (!testResponse.ok) {
-        throw new Error(`Backend not responding. Status: ${testResponse.status}`);
-      }
-      const testData = await testResponse.json();
-      console.log('Backend test response:', testData);
-    } catch (testError) {
-      console.error('Backend connection test failed:', testError);
-      alert(`Backend tidak dapat diakses: ${testError.message}. Pastikan backend berjalan di http://localhost:5001`);
+    if (!formData.name.trim() || !formData.category) {
+      setUploadStatus({ type: 'error', message: 'Nama pakaian dan kategori harus diisi' });
       return;
     }
 
     setIsUploading(true);
+    setUploadStatus({ type: 'info', message: 'Mengupload...' });
     
     const submitFormData = new FormData();
     submitFormData.append('image', selectedFile);
     Object.keys(formData).forEach(key => {
-      submitFormData.append(key, formData[key]);
+      if (formData[key]) {
+        submitFormData.append(key, formData[key]);
+      }
     });
 
     try {
-      console.log('Sending upload request to:', `${finalApiUrl}/upload`);
+      console.log('📤 Sending upload request to:', `${API_BASE_URL}/upload`);
       
-      const response = await fetch(`${finalApiUrl}/upload`, {
+      const response = await fetch(`${API_BASE_URL}/upload`, {
         method: 'POST',
         body: submitFormData,
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      console.log('📡 Upload response status:', response.status);
+      
+      const result = await response.json();
+      console.log('📥 Upload result:', result);
 
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Upload result:', result);
+      if (response.ok && result.success) {
+        setUploadStatus({ 
+          type: 'success', 
+          message: `✅ ${result.message || 'Pakaian berhasil diupload ke database!'}`
+        });
         
-        if (result.success) {
-          alert('Pakaian berhasil diupload!');
-          // Reset form
-          setFormData({
-            name: '',
-            category: '',
-            color: '',
-            brand: '',
-            size: '',
-            description: ''
-          });
-          setSelectedFile(null);
-          setPreviewUrl(null);
-        } else {
-          throw new Error(result.message || 'Upload gagal');
-        }
+        // Reset form
+        setFormData({
+          name: '',
+          category: '',
+          color: '',
+          brand: '',
+          size: '',
+          description: ''
+        });
+        setSelectedFile(null);
+        setPreviewUrl(null);
+        
+        // Clear success message after 5 seconds
+        setTimeout(() => {
+          setUploadStatus(null);
+        }, 5000);
+        
       } else {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('Upload failed with status:', response.status, errorData);
-        throw new Error(errorData.error || `Upload gagal dengan status ${response.status}`);
+        throw new Error(result.error || result.message || `Upload gagal dengan status ${response.status}`);
       }
     } catch (error) {
-      console.error('Error uploading:', error);
+      console.error('❌ Error uploading:', error);
+      
+      let errorMessage = 'Terjadi kesalahan saat upload';
       
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        alert('Tidak dapat terhubung ke server. Pastikan backend berjalan di http://localhost:5001');
+        errorMessage = 'Tidak dapat terhubung ke server. Pastikan backend berjalan di http://localhost:3001';
       } else {
-        alert(`Terjadi kesalahan saat upload: ${error.message}`);
+        errorMessage = `Upload gagal: ${error.message}`;
       }
+      
+      setUploadStatus({ type: 'error', message: errorMessage });
     } finally {
       setIsUploading(false);
     }
   };
 
+  // Don't render until mounted to prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="upload-form">
+        <div className="animate-pulse space-y-6">
+          <div className="h-32 bg-gray-200 rounded"></div>
+          <div className="h-10 bg-gray-200 rounded"></div>
+          <div className="h-10 bg-gray-200 rounded"></div>
+          <div className="h-10 bg-gray-200 rounded"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="upload-form">
+      {/* Status Message */}
+      {uploadStatus && (
+        <div className={`mb-4 p-4 rounded-md ${
+          uploadStatus.type === 'success' ? 'bg-green-100 border border-green-400 text-green-700' :
+          uploadStatus.type === 'error' ? 'bg-red-100 border border-red-400 text-red-700' :
+          'bg-blue-100 border border-blue-400 text-blue-700'
+        }`}>
+          {uploadStatus.message}
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Upload Gambar */}
         <div>
@@ -146,8 +183,11 @@ export default function UploadForm() {
                   <img 
                     src={previewUrl} 
                     alt="Preview" 
-                    className="mx-auto h-32 w-32 object-cover rounded-lg"
+                    className="mx-auto h-32 w-32 object-cover rounded-lg shadow-md"
                   />
+                  <p className="mt-2 text-sm text-gray-600">
+                    {selectedFile?.name} ({(selectedFile?.size / 1024 / 1024).toFixed(2)} MB)
+                  </p>
                 </div>
               ) : (
                 <svg
@@ -296,10 +336,20 @@ export default function UploadForm() {
         <div className="flex justify-end">
           <button
             type="submit"
-            disabled={isUploading}
+            disabled={isUploading || !selectedFile}
             className="px-6 py-2 bg-blue-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {isUploading ? 'Mengupload...' : 'Upload Pakaian'}
+            {isUploading ? (
+              <span className="flex items-center">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Mengupload...
+              </span>
+            ) : (
+              'Upload Pakaian'
+            )}
           </button>
         </div>
       </form>

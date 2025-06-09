@@ -1,144 +1,229 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function DebugComponent() {
-  const [testResult, setTestResult] = useState('');
-  const [testing, setTesting] = useState(false);
+  const [debugInfo, setDebugInfo] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const testBackend = async () => {
-    setTesting(true);
-    setTestResult('Starting comprehensive backend test...\n');
+  const API_BASE_URL = 'http://localhost:3001/api';
 
+  const fetchDebugInfo = async () => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      // Test environment variables
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-      const fallbackUrl = 'http://localhost:5001/api';
-      const finalUrl = apiUrl || fallbackUrl;
-
-      setTestResult(prev => prev + `📋 Environment Check:
-• NEXT_PUBLIC_API_URL: ${apiUrl || 'NOT SET'}
-• Fallback URL: ${fallbackUrl}
-• Final URL: ${finalUrl}
-• Window location: ${typeof window !== 'undefined' ? window.location.origin : 'N/A'}\n`);
-
-      // Test 1: Basic backend connection
-      setTestResult(prev => prev + '\n🔄 Test 1: Basic backend connection...\n');
+      console.log('🔍 Fetching debug info from:', `${API_BASE_URL}/debug/full`);
       
-      try {
-        const response = await fetch(`${finalUrl}/test`, {
-          method: 'GET',
-          mode: 'cors',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setTestResult(prev => prev + `✅ Backend connection SUCCESS!
-• Status: ${response.status}
-• Response: ${JSON.stringify(data, null, 2)}\n`);
-        } else {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-      } catch (error) {
-        setTestResult(prev => prev + `❌ Backend connection FAILED: ${error.message}\n`);
-        throw error;
+      const response = await fetch(`${API_BASE_URL}/debug/full`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-
-      // Test 2: Upload endpoint existence
-      setTestResult(prev => prev + '\n🔄 Test 2: Testing upload endpoint...\n');
       
-      try {
-        const response = await fetch(`${finalUrl}/upload`, {
-          method: 'OPTIONS',
-          mode: 'cors',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        });
-        
-        setTestResult(prev => prev + `✅ Upload endpoint accessible!
-• Status: ${response.status}
-• CORS headers: ${JSON.stringify(Object.fromEntries(
-  [...response.headers.entries()].filter(([key]) => 
-    key.toLowerCase().includes('access-control')
-  )
-), null, 2)}\n`);
-      } catch (error) {
-        setTestResult(prev => prev + `❌ Upload endpoint test FAILED: ${error.message}\n`);
-      }
-
-      // Test 3: Mock multipart upload
-      setTestResult(prev => prev + '\n🔄 Test 3: Testing multipart upload format...\n');
-      
-      try {
-        const formData = new FormData();
-        formData.append('name', 'Test Item');
-        formData.append('category', 'accessories');
-        
-        // Create a tiny test image blob
-        const canvas = document.createElement('canvas');
-        canvas.width = 1;
-        canvas.height = 1;
-        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-        formData.append('image', blob, 'test.png');
-
-        const response = await fetch(`${finalUrl}/upload`, {
-          method: 'POST',
-          mode: 'cors',
-          body: formData,
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          setTestResult(prev => prev + `✅ Mock upload SUCCESS!
-• Status: ${response.status}
-• Response: ${JSON.stringify(result, null, 2)}\n`);
-        } else {
-          const errorText = await response.text();
-          setTestResult(prev => prev + `⚠️ Mock upload failed but endpoint responding:
-• Status: ${response.status}
-• Error: ${errorText}\n`);
-        }
-      } catch (error) {
-        setTestResult(prev => prev + `❌ Mock upload FAILED: ${error.message}\n`);
-      }
-
-      setTestResult(prev => prev + '\n🎉 All tests completed! Check results above.\n');
-
-    } catch (error) {
-      setTestResult(prev => prev + `\n💥 CRITICAL ERROR: ${error.message}
-      
-🔧 Troubleshooting Steps:
-1. ✅ Check if backend is running: npm run dev in backend folder
-2. ✅ Verify backend URL: http://localhost:5001/api/test (open in browser)
-3. ✅ Check .env file exists in frontend root with: NEXT_PUBLIC_API_URL=http://localhost:5001/api
-4. ✅ Restart both servers after env changes
-5. ✅ Check backend logs for errors\n`);
+      const data = await response.json();
+      console.log('📥 Debug data received:', data);
+      setDebugInfo(data);
+    } catch (err) {
+      console.error('❌ Error fetching debug info:', err);
+      setError(err.message);
     } finally {
-      setTesting(false);
+      setLoading(false);
     }
   };
 
-  return (
-    <div className="bg-gray-100 p-4 rounded-lg mb-6">
-      <h3 className="text-lg font-semibold mb-3 text-gray-800">🔧 Backend Connection Debug</h3>
+  const testConnection = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/test`);
       
-      <button
-        onClick={testBackend}
-        disabled={testing}
-        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 mb-3"
-      >
-        {testing ? 'Testing...' : 'Test Backend Connection'}
-      </button>
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('✅ Connection test successful:', data);
+      alert(`✅ Connection successful!\n${data.message}`);
+    } catch (err) {
+      console.error('❌ Connection test failed:', err);
+      setError(err.message);
+      alert(`❌ Connection failed: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      {testResult && (
-        <div className="bg-white p-3 rounded border">
-          <pre className="text-sm text-gray-700 whitespace-pre-wrap">{testResult}</pre>
+  const addTestData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/debug/add-test-data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('✅ Test data added:', data);
+      alert(`✅ Test data added: ${data.message}`);
+      fetchDebugInfo(); // Refresh debug info
+    } catch (err) {
+      console.error('❌ Error adding test data:', err);
+      setError(err.message);
+      alert(`❌ Failed to add test data: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDebugInfo();
+  }, []);
+
+  return (
+    <div className="mb-8 p-6 bg-gray-50 border border-gray-200 rounded-lg">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-medium text-gray-900">🔧 Debug Information</h3>
+        <div className="flex space-x-2">
+          <button
+            onClick={testConnection}
+            disabled={loading}
+            className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:opacity-50 transition-colors"
+          >
+            Test Connection
+          </button>
+          <button
+            onClick={addTestData}
+            disabled={loading}
+            className="px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:opacity-50 transition-colors"
+          >
+            Add Test Data
+          </button>
+          <button
+            onClick={fetchDebugInfo}
+            disabled={loading}
+            className="px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600 disabled:opacity-50 transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm">
+          <strong>Error:</strong> {error}
         </div>
       )}
+
+      {loading && (
+        <div className="text-center py-4">
+          <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+          <span className="ml-2 text-sm text-gray-600">Loading...</span>
+        </div>
+      )}
+
+      {debugInfo && (
+        <div className="space-y-4">
+          {/* Server Status */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white p-4 rounded border">
+              <h4 className="font-medium text-gray-800 mb-2">🌐 Server Status</h4>
+              <div className="text-sm space-y-1">
+                <p><span className="font-medium">Port:</span> {debugInfo.server?.port}</p>
+                <p><span className="font-medium">Uptime:</span> {debugInfo.server?.uptime}</p>
+                <p><span className="font-medium">Timestamp:</span> {new Date(debugInfo.timestamp).toLocaleString()}</p>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded border">
+              <h4 className="font-medium text-gray-800 mb-2">💾 Database Status</h4>
+              <div className="text-sm space-y-1">
+                <p><span className="font-medium">Type:</span> {debugInfo.database?.type}</p>
+                <p><span className="font-medium">Connected:</span> 
+                  <span className={`ml-1 ${debugInfo.database?.connected ? 'text-green-600' : 'text-red-600'}`}>
+                    {debugInfo.database?.connected ? '✅ Yes' : '❌ No'}
+                  </span>
+                </p>
+                <p><span className="font-medium">Total Items:</span> {debugInfo.database?.totalItems}</p>
+                <p><span className="font-medium">Empty:</span> 
+                  <span className={`ml-1 ${debugInfo.database?.isEmpty ? 'text-yellow-600' : 'text-green-600'}`}>
+                    {debugInfo.database?.isEmpty ? '⚠️ Yes' : '✅ No'}
+                  </span>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Categories */}
+          <div className="bg-white p-4 rounded border">
+            <h4 className="font-medium text-gray-800 mb-2">📦 Categories</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+              <div className="bg-blue-50 p-2 rounded text-center">
+                <div className="font-medium text-blue-800">Tops</div>
+                <div className="text-blue-600">{debugInfo.categories?.tops || 0}</div>
+              </div>
+              <div className="bg-green-50 p-2 rounded text-center">
+                <div className="font-medium text-green-800">Bottoms</div>
+                <div className="text-green-600">{debugInfo.categories?.bottoms || 0}</div>
+              </div>
+              <div className="bg-purple-50 p-2 rounded text-center">
+                <div className="font-medium text-purple-800">Shoes</div>
+                <div className="text-purple-600">{debugInfo.categories?.shoes || 0}</div>
+              </div>
+              <div className="bg-yellow-50 p-2 rounded text-center">
+                <div className="font-medium text-yellow-800">Accessories</div>
+                <div className="text-yellow-600">{debugInfo.categories?.accessories || 0}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Uploads */}
+          {debugInfo.recentUploads && debugInfo.recentUploads.length > 0 && (
+            <div className="bg-white p-4 rounded border">
+              <h4 className="font-medium text-gray-800 mb-2">📸 Recent Uploads</h4>
+              <div className="space-y-2">
+                {debugInfo.recentUploads.map((item, index) => (
+                  <div key={index} className="text-sm border-l-2 border-gray-200 pl-3">
+                    <div className="font-medium">{item.name || 'Unnamed'}</div>
+                    <div className="text-gray-600">
+                      Category: {item.category} | Color: {item.color || 'unknown'}
+                      {item.imageUrl && (
+                        <span className="ml-2">
+                          | Image: <span className="text-blue-600">{item.imageUrl}</span>
+                        </span>
+                      )}
+                    </div>
+                    {item.createdAt && (
+                      <div className="text-gray-500 text-xs">
+                        Created: {new Date(item.createdAt).toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm">
+        <div className="font-medium text-blue-800 mb-1">📋 API Endpoints:</div>
+        <div className="text-blue-700 space-y-1">
+          <div>• GET {API_BASE_URL}/test</div>
+          <div>• POST {API_BASE_URL}/upload</div>
+          <div>• GET {API_BASE_URL}/clothes</div>
+          <div>• GET {API_BASE_URL}/debug/full</div>
+        </div>
+      </div>
     </div>
   );
 }
