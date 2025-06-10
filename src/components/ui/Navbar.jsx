@@ -43,6 +43,9 @@ const Navbar = () => {
               <NavLink href="/recommend" current={pathname === "/recommend"}>
                 Recommend
               </NavLink>
+              <NavLink href="/community" current={pathname === "/community"}>
+                Community
+              </NavLink>
             </div>
           </div>
           
@@ -82,6 +85,9 @@ const Navbar = () => {
           </MobileNavLink>
           <MobileNavLink href="/mix-match" current={pathname === "/mix-match"} onClick={toggleMenu}>
             Mix & Match
+          </MobileNavLink>
+          <MobileNavLink href="/community" current={pathname === "/community"} onClick={toggleMenu}>
+            Community
           </MobileNavLink>
           <MobileNavLink href="/recommend" current={pathname === "/recommend"} onClick={toggleMenu}>
             Recommend
